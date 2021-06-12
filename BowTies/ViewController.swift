@@ -1,39 +1,11 @@
 /// Copyright (c) 2020 Razeware LLC
 ///
-/// Permission is hereby granted, free of charge, to any person obtaining a copy
-/// of this software and associated documentation files (the "Software"), to deal
-/// in the Software without restriction, including without limitation the rights
-/// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-/// copies of the Software, and to permit persons to whom the Software is
-/// furnished to do so, subject to the following conditions:
-///
-/// The above copyright notice and this permission notice shall be included in
-/// all copies or substantial portions of the Software.
-///
-/// Notwithstanding the foregoing, you may not use, copy, modify, merge, publish,
-/// distribute, sublicense, create a derivative work, and/or sell copies of the
-/// Software in any work that is designed, intended, or marketed for pedagogical or
-/// instructional purposes related to programming, coding, application development,
-/// or information technology.  Permission for such use, copying, modification,
-/// merger, publication, distribution, sublicensing, creation of derivative works,
-/// or sale is expressly withheld.
-///
-/// This project and source code may use libraries or frameworks that are
-/// released under various Open-Source licenses. Use of those libraries and
-/// frameworks are governed by their own individual licenses.
-///
-/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-/// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-/// THE SOFTWARE.
 
 import UIKit
+import CoreData
 
 class ViewController: UIViewController {
-  // MARK: - IBOutlets
+  
   @IBOutlet weak var segmentedControl: UISegmentedControl!
   @IBOutlet weak var imageView: UIImageView!
   @IBOutlet weak var nameLabel: UILabel!
@@ -44,12 +16,12 @@ class ViewController: UIViewController {
   @IBOutlet weak var wearButton: UIButton!
   @IBOutlet weak var rateButton: UIButton!
 
-  // MARK: - View Life Cycle
+  var managedContext: NSManagedObjectContext!
+  
   override func viewDidLoad() {
     super.viewDidLoad()
   }
 
-  // MARK: - IBActions
 
   @IBAction func segmentedControl(_ sender: UISegmentedControl) {
     // Add code here
@@ -62,4 +34,65 @@ class ViewController: UIViewController {
   @IBAction func rate(_ sender: UIButton) {
     // Add code here
   }
+  
+  func insertSampleData() {
+    
+    let fetch: NSFetchRequest<BowTie> = BowTie.fetchRequest()
+    fetch.predicate = NSPredicate(format: "searchKey != nil")
+    
+    let tieCount = (try? managedContext.count (for: fetch)) ?? 0
+    
+    if tieCount > 0 {
+      return
+    }
+    
+    guard let path = Bundle.main.path(forResource: "SampleData", ofType: "plist") else { return }
+    let dataArray = NSArray(contentsOfFile: path)!
+    
+    for dict in dataArray {
+      let entity = NSEntityDescription.entity(forEntityName: "BowTie", in: managedContext)!
+      let bowtie = BowTie(entity: entity, insertInto: managedContext)
+      let btDict = dict as! [String: Any]
+      bowtie.id = UUID(uuidString: btDict["id"] as! String)
+      bowtie.name = btDict["name"] as? String
+      bowtie.searchKey = btDict["searchKey"] as? String
+      bowtie.rating = btDict["rating"] as! Double
+      
+      let colorDict = btDict["tintColor"] as! [String: Any]
+      bowtie.tintColor = UIColor.color(dict: colorDict)
+      
+      let imageName = btDict["imageName"] as? String
+      let image = UIImage(named: imageName!)
+      bowtie.photoData = image?.pngData()
+      bowtie.lastWorn = btDict["lastWorn"] as? Date
+      
+      let timesNumber = btDict["timesWorn"] as! NSNumber
+      bowtie.timesWorn = timesNumber.int32Value
+      bowtie.isFavorite = btDict["isFavorite"] as! Bool
+      bowtie.url = URL(string: btDict["url"] as! String)
+    }
+    try? managedContext.save()
+  }
+  
+}
+
+extension UIColor {
+  
+  static func color(dict: [String: Any]) -> UIColor? {
+    guard
+      let red = dict["red"] as? NSNumber,
+      let green = dict["green"] as? NSNumber,
+      let blue = dict["blue"] as? NSNumber
+    else {
+      return nil
+    }
+    
+    return UIColor(
+      red: CGFloat(truncating: red) / 255.0,
+      green: CGFloat(truncating: green) / 255.0,
+      blue: CGFloat(truncating: blue) / 255.0,
+      alpha: 1
+    )
+  }
+  
 }
